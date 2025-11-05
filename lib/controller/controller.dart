@@ -265,31 +265,61 @@ class Controller extends GetxController {
   // SECTION 6️⃣: ATTENDANCE MANAGEMENT
   // ============================================================
   static Future<void> saveAttendance() async {
-    final docRef = FirebaseFirestore.instance
-        .collection("attendance")
-        .doc(selectedClass.value)
-        .collection(selectedDiv.value)
-        .doc(selectedSubject.value)
-        .collection("dates")
-        .doc(todayDate.value);
+    try {
+      final firestore = FirebaseFirestore.instance;
 
-    await docRef.set({
-      "date": todayDate.value,
-      "classroom": selectedClassroom.value,
-      "students": FieldValue.arrayUnion([
-        {
-          "enrollment_number": matchedStudent[0],
-          "first_name": matchedStudent[1],
-          "middle_name": matchedStudent[2],
-          "last_name": matchedStudent[3],
-          "div": matchedStudent[4],
-          "status": true,
+      final docRef = firestore
+          .collection("attendance")
+          .doc(selectedClass.value.trim())      // e.g. "sem 1"
+          .collection(selectedDiv.value.trim()) // e.g. "A"
+          .doc(selectedSubject.value.trim())    // e.g. "c"
+          .collection("dates")
+          .doc(todayDate.value.trim());         // e.g. "2025-11-5"
+
+      final snapshot = await docRef.get();
+
+      Map<String, dynamic> newStudent = {
+        "enrollment_number": matchedStudent[0],
+        "first_name": matchedStudent[1],
+        "middle_name": matchedStudent[2],
+        "last_name": matchedStudent[3],
+        "div": matchedStudent[4],
+        "status": true,
+      };
+
+      if (snapshot.exists) {
+        final data = snapshot.data()!;
+        final students = List<Map<String, dynamic>>.from(data['students']);
+
+        // Check if student already exists
+        final index = students.indexWhere(
+                (s) => s['enrollment_number'] == matchedStudent[0]);
+
+        if (index >= 0) {
+          // Update existing student's status
+          students[index] = newStudent;
+        } else {
+          // Add new student
+          students.add(newStudent);
         }
-      ])
-    }, SetOptions(merge: true));
 
-    showCustomSnackbar("Attendance marked successfully",
-        type: SnackbarType.success);
+        await docRef.update({
+          "students": students,
+        });
+      } else {
+        // Create new document if not exists
+        await docRef.set({
+          "date": todayDate.value,
+          "classroom": selectedClassroom.value,
+          "students": [newStudent],
+        });
+      }
+
+      showCustomSnackbar("Attendance marked successfully",
+          type: SnackbarType.success);
+    } catch (e) {
+      showCustomSnackbar("Error: $e", type: SnackbarType.error);
+    }
   }
 
   static Future<List<String>> getAllDates(
@@ -315,11 +345,11 @@ class Controller extends GetxController {
   static Future<List<Map<String, dynamic>>> getAttendanceList(String date) async {
     final doc = await FirebaseFirestore.instance
         .collection("attendance")
-        .doc(selectedClass.value)
-        .collection(selectedDiv.value)
-        .doc(selectedSubject.value)
+        .doc(selectedClass.value.trim())
+        .collection(selectedDiv.value.trim())
+        .doc(selectedSubject.value.trim())
         .collection("dates")
-        .doc(date)
+        .doc(date.trim())
         .get();
 
     final data = doc.data();

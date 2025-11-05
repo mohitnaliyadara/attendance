@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home:
-      StudentReport(enrollmentNumber: "8904274424741"),
+        StudentReport(),
     );
   }
 }

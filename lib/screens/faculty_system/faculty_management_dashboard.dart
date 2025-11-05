@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/app_text_style.dart';
 import '../../widgets/custom_snackbar.dart';
+import '../student_system/student_attendance_show.dart';
 import 'get_reports/get_reposts.dart';
 
 enum UserRole { faculty, student }
@@ -49,7 +50,7 @@ class _FacultyManagementDashboardState
   }
 
   void _goToProfile(BuildContext context) {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GetReposts(),));
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => StudentReport(),));
   }
 
   @override
