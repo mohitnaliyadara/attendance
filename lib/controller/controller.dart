@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io' if (dart.library.html) 'dart:html' as html;
+import 'dart:io';
 import 'package:attendance/widgets/custom_snackbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart';
@@ -8,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:intl/intl.dart';
 import 'package:mime/mime.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:open_filex/open_filex.dart';
@@ -268,56 +271,70 @@ class Controller extends GetxController {
     try {
       final firestore = FirebaseFirestore.instance;
 
+      // Safely extract values
+      final sem = (selectedClass.value ?? '').toString().trim();
+      final div = (selectedDiv.value ?? '').toString().trim();
+      final subject = (selectedSubject.value ?? '').toString().trim();
+      final rawDate = todayDate.value;
+
+      final dateFormatter = DateFormat('yyyy-MM-dd');
+      final date = rawDate is DateTime
+          ? dateFormatter.format(rawDate as DateTime)
+          : rawDate.toString().trim();
+
+      print('🔥 Firestore Path: attendance/$sem/$div/$subject/dates/$date');
+
       final docRef = firestore
           .collection("attendance")
-          .doc(selectedClass.value.trim())      // e.g. "sem 1"
-          .collection(selectedDiv.value.trim()) // e.g. "A"
-          .doc(selectedSubject.value.trim())    // e.g. "c"
+          .doc(sem)
+          .collection(div)
+          .doc(subject)
           .collection("dates")
-          .doc(todayDate.value.trim());         // e.g. "2025-11-5"
+          .doc(date);
 
       final snapshot = await docRef.get();
 
-      Map<String, dynamic> newStudent = {
-        "enrollment_number": matchedStudent[0],
-        "first_name": matchedStudent[1],
-        "middle_name": matchedStudent[2],
-        "last_name": matchedStudent[3],
-        "div": matchedStudent[4],
+      final newStudent = {
+        "enrollment_number": matchedStudent[0].toString().trim(),
+        "first_name": matchedStudent[1].toString().trim(),
+        "middle_name": matchedStudent[2].toString().trim(),
+        "last_name": matchedStudent[3].toString().trim(),
+        "div": matchedStudent[4].toString().trim(),
         "status": true,
       };
 
       if (snapshot.exists) {
         final data = snapshot.data()!;
-        final students = List<Map<String, dynamic>>.from(data['students']);
+        final students = (data['students'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+            [];
 
-        // Check if student already exists
         final index = students.indexWhere(
                 (s) => s['enrollment_number'] == matchedStudent[0]);
 
         if (index >= 0) {
-          // Update existing student's status
           students[index] = newStudent;
         } else {
-          // Add new student
           students.add(newStudent);
         }
 
-        await docRef.update({
-          "students": students,
-        });
+        await docRef.update({"students": students});
+        print('✅ Existing date updated.');
       } else {
-        // Create new document if not exists
         await docRef.set({
-          "date": todayDate.value,
+          "date": date,
           "classroom": selectedClassroom.value,
           "students": [newStudent],
         });
+        print('✅ New date created.');
       }
 
       showCustomSnackbar("Attendance marked successfully",
           type: SnackbarType.success);
-    } catch (e) {
+    } catch (e, st) {
+      print('❌ Firestore Save Error: $e');
+      print(st);
       showCustomSnackbar("Error: $e", type: SnackbarType.error);
     }
   }
@@ -387,6 +404,183 @@ class Controller extends GetxController {
 
 
 
+  // Storage permission
+
+  static Future<bool> checkStoragePermission() async {
+    try {
+      if (!Platform.isAndroid) return true; // No need for iOS/web
+
+      // For Android 13+ (Scoped Storage)
+      final manageStorage = await Permission.manageExternalStorage.status;
+      final storage = await Permission.storage.status;
+
+      if (manageStorage.isGranted || storage.isGranted) {
+        return true;
+      }
+
+      // Request permission
+      final result = await Permission.manageExternalStorage.request();
+
+      if (result.isGranted) {
+        return true;
+      } else {
+        showCustomSnackbar(
+          "Storage permission denied. Please allow access to save the file.",
+          type: SnackbarType.info,
+        );
+        return false;
+      }
+    } catch (e) {
+      showCustomSnackbar("Permission check failed: $e", type: SnackbarType.error);
+      return false;
+    }
 
 
+
+  }
+  // generate Excel file
+
+  static Future<void> generateSubjectWiseReport(String className, String div) async {
+    try {
+      if (className.isEmpty || div.isEmpty) {
+        showCustomSnackbar("Please select Class and Division", type: SnackbarType.info);
+        return;
+      }
+
+      final hasPermission = await checkStoragePermission();
+      if (!hasPermission) return;
+
+      final firestore = FirebaseFirestore.instance;
+      final divRef = firestore.collection('attendance').doc(className).collection(div);
+
+      // 🔹 Get all subjects (dynamic)
+      final subjectDocs = await divRef.get();
+      final List<String> subjects = subjectDocs.docs.map((e) => e.id).toList();
+
+      // 🔹 Store attendance per student per subject
+      Map<String, Map<String, dynamic>> studentStats = {};
+
+      for (final subject in subjects) {
+        final datesCollection = divRef.doc(subject).collection('dates');
+        final datesSnapshot = await datesCollection.get();
+
+        for (final dateDoc in datesSnapshot.docs) {
+          final data = dateDoc.data();
+          final students = (data['students'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+              [];
+
+          for (final s in students) {
+            final enrollment = s['enrollment_number']?.toString() ?? '';
+            if (enrollment.isEmpty) continue;
+
+            // Initialize student if not exists
+            studentStats.putIfAbsent(enrollment, () {
+              return {
+                'first_name': s['first_name'] ?? '',
+                'middle_name': s['middle_name'] ?? '',
+                'last_name': s['last_name'] ?? '',
+                'subjects': <String, dynamic>{}, // ✅ safe map
+              };
+            });
+
+            // Safe dynamic subject map
+            final subjectsMap =
+            studentStats[enrollment]!['subjects'] as Map<String, dynamic>;
+            subjectsMap.putIfAbsent(subject, () => {'present': 0, 'total': 0});
+
+            subjectsMap[subject]['total'] =
+                ((subjectsMap[subject]['total'] ?? 0) + 1).toInt();
+
+            if (s['status'] == true) {
+              subjectsMap[subject]['present'] =
+                  ((subjectsMap[subject]['present'] ?? 0) + 1).toInt();
+            }
+          }
+        }
+      }
+
+      // 🔹 Create Excel workbook
+      final excel = Excel.createExcel();
+      final sheet = excel['Subject Report'];
+
+      // 🔹 Header row
+      List<CellValue> header = [
+         TextCellValue("Enrollment No"),
+         TextCellValue("Full Name"),
+      ];
+
+      for (final subject in subjects) {
+        header.addAll([
+          TextCellValue("$subject Present"),
+          TextCellValue("$subject Absent"),
+        ]);
+      }
+
+      header.addAll([
+         TextCellValue("Total Classes"),
+         TextCellValue("Total Present"),
+         TextCellValue("Percentage"),
+      ]);
+
+      sheet.appendRow(header);
+
+      // 🔹 Fill student rows
+      studentStats.forEach((enrollment, data) {
+        final subjectsMap = data['subjects'] as Map<String, dynamic>;
+        int totalPresent = 0;
+        int totalClasses = 0;
+
+        List<CellValue> row = [
+          TextCellValue(enrollment.toString()),
+          TextCellValue(
+            "${data['first_name']} ${data['middle_name']} ${data['last_name']}".trim(),
+          ),
+        ];
+
+        for (final subject in subjects) {
+          final int present = (subjectsMap[subject]?['present'] ?? 0).toInt();
+          final int total = (subjectsMap[subject]?['total'] ?? 0).toInt();
+          final absent = total - present;
+
+          totalPresent += present;
+          totalClasses += total;
+
+          row.add(IntCellValue(present));
+          row.add(IntCellValue(absent));
+        }
+
+        final percentage =
+        totalClasses > 0 ? (totalPresent / totalClasses) * 100 : 0.0;
+
+        row.add(IntCellValue(totalClasses));
+        row.add(IntCellValue(totalPresent));
+        row.add(TextCellValue("${percentage.toStringAsFixed(1)}%"));
+
+        sheet.appendRow(row);
+      });
+
+      // 🔹 Save Excel file
+      final dir = Platform.isAndroid
+          ? Directory('/storage/emulated/0/Download')
+          : await getApplicationDocumentsDirectory();
+
+      if (!await dir.exists()) await dir.create(recursive: true);
+
+      final filePath = "${dir.path}/$className-$div-SubjectWise-Summary.xlsx";
+      final bytes = excel.encode();
+
+      final file = File(filePath)
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(bytes!);
+
+      log("✅ Excel saved at: $filePath");
+      showCustomSnackbar("Report generated successfully!", type: SnackbarType.success);
+      await OpenFilex.open(file.path);
+    } catch (e, st) {
+      log("❌ Error generating Excel: $e\n$st");
+      showCustomSnackbar("Error: $e", type: SnackbarType.error);
+    }
+  }
 }

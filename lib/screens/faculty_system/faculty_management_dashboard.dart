@@ -1,6 +1,7 @@
 import 'package:attendance/screens/faculty_system/file_upload/select_division.dart';
 import 'package:attendance/screens/faculty_system/show_attendance/attendance_record.dart';
 import 'package:attendance/screens/faculty_system/take_attendance/select_class_screen.dart';
+import 'package:attendance/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/app_text_style.dart';
@@ -50,7 +51,7 @@ class _FacultyManagementDashboardState
   }
 
   void _goToProfile(BuildContext context) {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => StudentReport(),));
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GetReports(),));
   }
 
   @override
@@ -75,8 +76,8 @@ class _FacultyManagementDashboardState
         color: Colors.deepPurpleAccent,
       ),
       DashboardTile(
-        title: "Profile & Settings",
-        icon: Icons.person_rounded,
+        title: "Get Repost",
+        icon: Icons.cloud_download,
         onTap: () => _goToProfile(context),
         color: Colors.teal,
       ),
@@ -98,6 +99,7 @@ class _FacultyManagementDashboardState
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
             onPressed: () {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginScreen(),));
               showCustomSnackbar("Faculty Logging out...",
                   type: SnackbarType.info);
             },

@@ -30,6 +30,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         leading: IconButton(onPressed: (){
+          Controller.barcodeValue.value = "";
           Navigator.pushReplacement(context,MaterialPageRoute(builder: (context) => SelectClassScreen(),));
         }, icon: Icon(Icons.arrow_back_ios, color: AppColors.whiteColor,)),
         backgroundColor: Colors.transparent,

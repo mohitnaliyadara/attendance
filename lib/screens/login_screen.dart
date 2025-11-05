@@ -1,4 +1,5 @@
 import 'package:attendance/controller/controller.dart';
+import 'package:attendance/screens/student_system/student_attendance_show.dart';
 import 'package:attendance/utils/app_text_style.dart';
 import 'package:attendance/widgets/custom_button.dart';
 import 'package:attendance/widgets/custom_snackbar.dart';
@@ -7,6 +8,7 @@ import 'package:attendance/widgets/custom_text_field.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../utils/app_colors.dart';
 import 'faculty_system/faculty_management_dashboard.dart';
 
@@ -30,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
       try {
         final querySnapshot = await _firestore
             .collection("login")
-            .where("username", isEqualTo: username)
+            .where("enrollment_number", isEqualTo: username)
             .get();
 
         if (querySnapshot.docs.isEmpty) {
@@ -44,11 +46,13 @@ class _LoginScreenState extends State<LoginScreen> {
         final role = userData["role"];
 
         if (password != storedPassword) {
+
           showCustomSnackbar("Incorrect password. Please try again.",
               type: SnackbarType.error);
           return;
         }
-
+        Controller.usernameController.clear();
+        Controller.passwordController.clear();
         showCustomSnackbar("Login successful! Redirecting...",
             type: SnackbarType.success);
 
@@ -57,8 +61,10 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.of(context).pushReplacement(MaterialPageRoute(
                 builder: (context) => const FacultyManagementDashboard()));
           } else {
-            showCustomSnackbar("Unknown role: $role",
-                type: SnackbarType.info);
+            GetStorage().write("enrollment number",username);
+            GetStorage().write("username",userData["username"]);
+
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => StudentReport(),));
           }
         });
       } catch (e) {
@@ -131,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Username field
                     customTextField(
-                      "Email or Username",
+                      "Enrollment Number",
                       prefixIcon: Icons.person,
                       controller: Controller.usernameController,
                       validator: (value) {
