@@ -1,3 +1,8 @@
+import 'package:attendance/screens/admin_system/add_class_screen.dart';
+import 'package:attendance/screens/admin_system/add_classroom_screen.dart';
+import 'package:attendance/screens/admin_system/add_division_screen.dart';
+import 'package:attendance/screens/admin_system/add_subjects_screen.dart';
+import 'package:attendance/screens/admin_system/admin_dashboard.dart';
 import 'package:attendance/screens/faculty_system/faculty_management_dashboard.dart';
 import 'package:attendance/screens/faculty_system/get_reports/get_reposts.dart';
 import 'package:attendance/screens/faculty_system/show_attendance/attendance_record.dart';
@@ -35,7 +40,7 @@ class MyApp extends StatelessWidget {
       ),
 
       home:
-        FacultyManagementDashboard(),
+        LoginScreen(),
     );
   }
 }

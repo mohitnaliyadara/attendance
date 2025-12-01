@@ -1,4 +1,5 @@
 import 'package:attendance/controller/controller.dart';
+import 'package:attendance/screens/admin_system/admin_dashboard.dart';
 import 'package:attendance/screens/student_system/student_attendance_show.dart';
 import 'package:attendance/utils/app_text_style.dart';
 import 'package:attendance/widgets/custom_button.dart';
@@ -9,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+
 import '../utils/app_colors.dart';
 import 'faculty_system/faculty_management_dashboard.dart';
 
@@ -36,8 +38,10 @@ class _LoginScreenState extends State<LoginScreen> {
             .get();
 
         if (querySnapshot.docs.isEmpty) {
-          showCustomSnackbar("User not found. Please try again.",
-              type: SnackbarType.error);
+          showCustomSnackbar(
+            "User not found. Please try again.",
+            type: SnackbarType.error,
+          );
           return;
         }
 
@@ -46,30 +50,50 @@ class _LoginScreenState extends State<LoginScreen> {
         final role = userData["role"];
 
         if (password != storedPassword) {
-
-          showCustomSnackbar("Incorrect password. Please try again.",
-              type: SnackbarType.error);
+          showCustomSnackbar(
+            "Incorrect password. Please try again.",
+            type: SnackbarType.error,
+          );
           return;
         }
+
+        // Clear fields
         Controller.usernameController.clear();
         Controller.passwordController.clear();
-        showCustomSnackbar("Login successful! Redirecting...",
-            type: SnackbarType.success);
 
+        showCustomSnackbar(
+          "Login successful! Redirecting...",
+          type: SnackbarType.success,
+        );
+
+        // Delay for smoother transition
         Future.delayed(const Duration(milliseconds: 1200), () {
           if (role == "faculty") {
-            Navigator.of(context).pushReplacement(MaterialPageRoute(
-                builder: (context) => const FacultyManagementDashboard()));
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const FacultyManagementDashboard()),
+            );
+          } else if (role == "admin") {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminDashboard()),
+            );
           } else {
-            GetStorage().write("enrollment number",username);
-            GetStorage().write("username",userData["username"]);
+            // Save student details
+            GetStorage().write("enrollment_number", username);
+            GetStorage().write("username", userData["username"]);
 
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => StudentReport(),));
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => StudentReport()),
+            );
           }
         });
       } catch (e) {
-        showCustomSnackbar("An error occurred. Please try again.",
-            type: SnackbarType.error);
+        showCustomSnackbar(
+          "An error occurred. Please try again.",
+          type: SnackbarType.error,
+        );
       }
     }
   }
@@ -79,20 +103,20 @@ class _LoginScreenState extends State<LoginScreen> {
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      // Background gradient added here
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFF4A90E2), // top color (soft blue)
-              Color(0xFF1976D2), // bottom color (deep blue)
+              Color(0xFF4A90E2),
+              Color(0xFF1976D2),
             ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
+
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -120,48 +144,50 @@ class _LoginScreenState extends State<LoginScreen> {
                       size: 100,
                       color: AppColors.primaryColor,
                     ),
+
                     const SizedBox(height: 16),
+
                     Text(
                       "Welcome Back!",
-                      style:
-                      AppTextStyle.bold22(color: AppColors.primaryColor),
+                      style: AppTextStyle.bold22(
+                        color: AppColors.primaryColor,
+                      ),
                     ),
+
                     const SizedBox(height: 4),
+
                     Text(
                       "Login to continue your attendance system",
-                      style:
-                      AppTextStyle.regular14(color: AppColors.blackColor),
+                      style: AppTextStyle.regular14(
+                        color: AppColors.blackColor,
+                      ),
                       textAlign: TextAlign.center,
                     ),
+
                     const SizedBox(height: 30),
 
-                    // Username field
                     customTextField(
-                      "Enrollment Number",
+                      "Enrollment Number / Username",
                       prefixIcon: Icons.person,
                       controller: Controller.usernameController,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "Please enter username";
-                        }
-                        return null;
-                      },
+                      validator: (value) =>
+                      value == null || value.isEmpty
+                          ? "Please enter username/enrollment number"
+                          : null,
                     ),
+
                     const SizedBox(height: 16),
 
-                    // Password field with toggle
                     Obx(
                           () => customTextField(
                         "Password",
                         prefixIcon: Icons.lock,
                         controller: Controller.passwordController,
                         obscureText: _obscurePassword.value,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return "Please enter password";
-                          }
-                          return null;
-                        },
+                        validator: (value) =>
+                        value == null || value.isEmpty
+                            ? "Please enter password"
+                            : null,
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword.value
@@ -175,6 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 10),
 
                     Align(
@@ -183,26 +210,28 @@ class _LoginScreenState extends State<LoginScreen> {
                         buttonText: "Forgot Password?",
                         onPressed: () {
                           showCustomSnackbar(
-                            "Password recovery not implemented yet.",
+                            "Password recovery not available yet.",
                             type: SnackbarType.info,
                           );
                         },
                       ),
                     ),
+
                     const SizedBox(height: 20),
 
-                    // Login button
                     customButton(
                       buttonText: "Login",
                       onPressed: _attemptLogin,
                       width: double.infinity,
                     ),
+
                     const SizedBox(height: 20),
 
                     Text(
                       "Version 1.0.0",
-                      style:
-                      AppTextStyle.regular12(color: Colors.grey.shade600),
+                      style: AppTextStyle.regular12(
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ],
                 ),
